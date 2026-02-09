@@ -2,81 +2,75 @@
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) {
-    checkApiKey(); // Check if user has already saved a key
+    // 1. Hook up the buttons
     document.getElementById("save-key-btn").onclick = saveApiKey;
     document.getElementById("clear-key-btn").onclick = clearApiKey;
-    
-    // Button Event Listeners
-    document.getElementById("reply-btn").onclick = () => runAI("reply");
-    document.getElementById("new-mail-btn").onclick = () => runAI("new");
+    document.getElementById("reply-btn").onclick = function() { runAI("reply"); };
+    document.getElementById("new-mail-btn").onclick = function() { runAI("new"); };
     document.getElementById("insert-btn").onclick = insertText;
+
+    // 2. Check if we already have a key
+    checkApiKey(); 
   }
 });
 
-// --- SETTINGS: API KEY MANAGEMENT ---
+// --- SETTINGS ---
 function saveApiKey() {
-    const key = document.getElementById("api-key-input").value;
+    const keyInput = document.getElementById("api-key-input");
+    const key = keyInput.value;
+    
     if (key && key.trim() !== "") {
         localStorage.setItem("myGeminiKey", key.trim());
-        checkApiKey();
+        checkApiKey(); // Refresh the view
     } else {
-        document.getElementById("api-key-input").style.border = "1px solid red";
+        keyInput.style.border = "2px solid red";
     }
 }
 
 function checkApiKey() {
     const key = localStorage.getItem("myGeminiKey");
     if (key) {
-        document.getElementById("settings-area").classList.add("hidden");
-        document.getElementById("main-area").classList.remove("hidden");
+        document.getElementById("settings-area").style.display = "none";
+        document.getElementById("main-area").style.display = "block";
     } else {
-        document.getElementById("settings-area").classList.remove("hidden");
-        document.getElementById("main-area").classList.add("hidden");
+        document.getElementById("settings-area").style.display = "block";
+        document.getElementById("main-area").style.display = "none";
     }
 }
 
 function clearApiKey() {
     localStorage.removeItem("myGeminiKey");
-    window.location.reload();
+    location.reload();
 }
 
-// --- AI GENERATION LOGIC ---
-export async function runAI(mode) {
+// --- AI LOGIC ---
+async function runAI(mode) {
   const resultArea = document.getElementById("result-area");
   resultArea.value = "Thinking...";
 
-  // Get content (either the email reply body OR your bullet points)
   Office.context.mailbox.item.body.getAsync("text", async function (result) {
     if (result.status === Office.AsyncResultStatus.Succeeded) {
       const textContext = result.value;
       const apiKey = localStorage.getItem("myGeminiKey");
 
-      // --- SYSTEM INSTRUCTIONS (The "Brain") ---
       let systemInstruction = `
         You are a busy professional assistant.
         STRICT RULES:
-        1.  **Length:** Extremely short, concise, and direct. No filler words.
-        2.  **Language:** South African English (use 'colour', 'organise', 'programme', 'centre').
-        3.  **Tone:** Professional but human. Avoid "AI" phrases like "I hope this email finds you well."
-        4.  **Formatting:** Plain text only. NO bold (**), NO italics, NO markdown headers (#).
-        5.  **Sign-off:** Do NOT include a signature (e.g., 'Kind regards', 'Name'). The user has an auto-signature.
-        6.  **Structure:** Use bullet points if listing items.
+        1. Length: Short, concise, direct.
+        2. Language: South African English (colour, programme, centre).
+        3. Tone: Professional but human. No "I hope this finds you well".
+        4. No Signature: The user has an auto-signature.
+        5. Formatting: Plain text only.
       `;
 
       let userPrompt = "";
-
       if (mode === "reply") {
-          userPrompt = `Task: Write a direct reply to this email.
-          Incoming Email: "${textContext}"`;
+          userPrompt = `Task: Write a direct reply. Incoming Email: "${textContext}"`;
       } else {
-          userPrompt = `Task: Write a NEW email based on these rough notes: "${textContext}".
-          Output Format:
-          Subject: [Write a clear Subject Line here]
-          
-          [Write Email Body here]`;
+          userPrompt = `Task: Write a NEW email based on notes: "${textContext}". 
+          Format: Subject: [Subject Here] \n\n [Body Here]`;
       }
 
-      // Using the Free Tier Model (1.5 Flash)
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
       try {
@@ -95,42 +89,30 @@ export async function runAI(mode) {
             return;
         }
         
-        if (!data.candidates || data.candidates.length === 0) {
-             resultArea.value = "No response generated.";
+        if (!data.candidates || !data.candidates.length) {
+             resultArea.value = "No response.";
              return;
         }
 
         let finalText = data.candidates[0].content.parts[0].text;
 
-        // Clean up Subject Line if in "New Mail" mode
         if (mode === "new" && finalText.includes("Subject:")) {
-            const subjectMatch = finalText.match(/Subject: (.*)/);
-            if (subjectMatch) {
-                const subjectLine = subjectMatch[1];
-                finalText = finalText.replace(/Subject: .*\n+/, "").trim(); // Remove subject from body
-                
-                // Auto-fill the actual Subject field in Outlook
-                Office.context.mailbox.item.subject.setAsync(subjectLine);
+            const match = finalText.match(/Subject: (.*)/);
+            if (match) {
+                Office.context.mailbox.item.subject.setAsync(match[1]);
+                finalText = finalText.replace(/Subject: .*\n+/, "").trim();
             }
         }
-
         resultArea.value = finalText.trim();
 
       } catch (error) {
-        console.error(error);
-        resultArea.value = "Network Error. Check internet connection.";
+        resultArea.value = "Network Error: " + error.message;
       }
-    } else {
-        resultArea.value = "Error: Could not read email content.";
     }
   });
 }
 
 function insertText() {
   const text = document.getElementById("result-area").value;
-  Office.context.mailbox.item.body.setSelectedDataAsync(text, { coercionType: Office.CoercionType.Text }, function(asyncResult){
-      if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-          document.getElementById("result-area").value += `\n\n[ERROR]: ${asyncResult.error.message}\n(Tip: Click 'Reply' or 'New Email' in Outlook first!)`;
-      }
-  });
+  Office.context.mailbox.item.body.setSelectedDataAsync(text, { coercionType: Office.CoercionType.Text });
 }
