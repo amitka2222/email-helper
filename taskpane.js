@@ -71,7 +71,8 @@ async function runAI(mode) {
           Format: Subject: [Subject Here] \n\n [Body Here]`;
       }
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      // FIX: Using 'gemini-flash-latest' which is safer for your account
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
 
       try {
         const response = await fetch(url, {
