@@ -3,18 +3,20 @@
 <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Email Helper</title>
     <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js" type="text/javascript"></script>
     <link rel="stylesheet" href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/11.0.0/css/fabric.min.css"/>
     <style>
         body { padding: 15px; font-family: "Segoe UI", sans-serif; background-color: #fff; }
         textarea { width: 100%; height: 120px; margin-bottom: 10px; border: 1px solid #ccc; font-family: sans-serif; padding: 5px; }
-        .btn { width: 100%; margin-bottom: 8px; padding: 10px; cursor: pointer; background: #0078d4; color: white; border: none; font-weight: 600; }
+        .btn { width: 100%; margin-bottom: 8px; padding: 12px; cursor: pointer; background: #0078d4; color: white; border: none; font-weight: 600; border-radius: 4px; }
         .btn:hover { background: #106ebe; }
         .secondary { background: #f3f2f1; color: #333; border: 1px solid #ccc; }
         .secondary:hover { background: #edebe9; }
         .hidden { display: none; }
         label { font-weight: 600; display: block; margin-bottom: 5px; }
+        .input-box { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
         small { color: #666; font-size: 11px; display: block; margin-top: 5px; }
     </style>
 </head>
@@ -22,26 +24,32 @@
     <h2 class="ms-font-xl">Email Assistant</h2>
 
     <div id="settings-area">
-        <label>Setup: Enter Gemini API Key</label>
-        <input type="password" id="api-key-input" style="width: 100%; margin-bottom: 10px; padding: 5px; box-sizing: border-box;" placeholder="Paste your AI Studio key here...">
-        <button id="save-key-btn" class="btn secondary">Save Key</button>
-        <p style="font-size: 11px; color: #666;">This key is stored securely in your browser, not on a server.</p>
+        <label>Setup Profile</label>
+        
+        <label style="font-weight:normal; font-size:12px;">Gemini API Key:</label>
+        <input type="password" id="api-key-input" class="input-box" placeholder="Paste API Key here...">
+        
+        <label style="font-weight:normal; font-size:12px;">Your Name (for Signature):</label>
+        <input type="text" id="user-name-input" class="input-box" placeholder="e.g. John Smith">
+
+        <button id="save-key-btn" class="btn secondary">Save Settings</button>
         <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;"/>
     </div>
 
     <div id="main-area" class="hidden">
-        <p class="ms-font-m">Choose an action:</p>
+        <p class="ms-font-m" style="margin-bottom:15px;">
+            <b>Tip:</b> Highlight your rough notes in the email body before clicking!
+        </p>
         
-        <button id="reply-btn" class="btn">Draft Reply (No Subject)</button>
+        <button id="reply-btn" class="btn">Draft Reply (From Selection)</button>
         <button id="new-mail-btn" class="btn secondary">Draft New Email (+Subject)</button>
 
-        <label>Result:</label>
-        <textarea id="result-area"></textarea>
-        
-        <button id="insert-btn" class="btn">Insert into Email</button>
+        <label>Preview:</label>
+        <div id="preview-box" style="width:100%; height:120px; overflow-y:scroll; border:1px solid #ccc; padding:5px; margin-bottom:10px; font-size:12px; background:#fafafa;"></div>
+        <textarea id="hidden-result" style="display:none;"></textarea> <button id="insert-btn" class="btn">Replace Text in Email</button>
         
         <div style="text-align: center; margin-top: 20px;">
-            <button id="clear-key-btn" style="background:none; border:none; color: #999; text-decoration: underline; cursor: pointer; font-size: 11px;">Reset API Key</button>
+            <button id="clear-key-btn" style="background:none; border:none; color: #999; text-decoration: underline; cursor: pointer; font-size: 11px;">Reset Settings</button>
         </div>
     </div>
 
