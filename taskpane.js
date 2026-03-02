@@ -68,13 +68,13 @@ async function runAI(mode) {
             const apiKey = localStorage.getItem("myGeminiKey");
             const userName = localStorage.getItem("myUserName") || "[My Name]";
 
-            // --- PROMPT ENGINEERING (FIXED FOR NO BOLD) ---
+            // --- STRICT PROMPT RULES (FIXED FOR WRAPPING AND BOLD) ---
             let systemInstruction = `
               You are an expert email assistant.
               RULES:
-              1. **Output Format:** Plain HTML (<p>, <br>). 
-              2. **NO Markdown:** Do not use bold (**) or markdown. 
-              3. **Formatting:** Use standard paragraphs.
+              1. **Output Format:** Plain HTML (<p>, <br>).
+              2. **NO Markdown/Bold:** Do NOT use bold (**) or markdown formatting anywhere.
+              3. **NO WORD WRAPPING:** Do NOT split words with hyphens. Do NOT insert line breaks to make the text narrow. Let the email client handle the text wrapping naturally.
               4. **Greeting:** Start with "Hi [Name]" or "Hi All".
               5. **Sign-off:** End strictly with: <br><br>Kind regards,<br>${userName}
               6. **Style:** Professional South African English. Concise.
@@ -115,8 +115,8 @@ async function runAI(mode) {
 
                 let finalHtml = data.candidates[0].content.parts[0].text;
                 
-                // Cleanup Markdown to be safe
-                finalHtml = finalHtml.replace(/\*\*/g, ""); // Removes bold ** markers
+                // --- CLEANUP SCRIPT (Removes any accidental bolding or code blocks) ---
+                finalHtml = finalHtml.replace(/\*\*/g, ""); 
                 finalHtml = finalHtml.replace(/```html/g, "").replace(/```/g, "");
 
                 if (mode === "new" && finalHtml.includes("<h1>")) {
