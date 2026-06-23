@@ -17,18 +17,16 @@ function saveSettings() {
     const key = document.getElementById("api-key-input").value;
     const name = document.getElementById("user-name-input").value;
     
-    if (key && key.trim() !== "") {
-        localStorage.setItem("myGeminiKey", key.trim());
-        localStorage.setItem("myUserName", name.trim());
-        checkSettings();
-    } else {
-        alert("Please enter an API Key.");
-    }
+    // Allow empty key for Local AI routing
+    localStorage.setItem("myGeminiKey", key.trim());
+    localStorage.setItem("myUserName", name.trim());
+    checkSettings();
 }
 
 function checkSettings() {
-    const key = localStorage.getItem("myGeminiKey");
-    if (key) {
+    // As long as they clicked save, let them into the main area
+    const name = localStorage.getItem("myUserName");
+    if (name !== null) { 
         document.getElementById("settings-area").style.display = "none";
         document.getElementById("main-area").style.display = "block";
     } else {
@@ -68,16 +66,16 @@ async function runAI(mode) {
             const apiKey = localStorage.getItem("myGeminiKey");
             const userName = localStorage.getItem("myUserName") || "[My Name]";
 
-            // --- STRICT PROMPT RULES (FIXED FOR WRAPPING AND BOLD) ---
+            // --- STRICT PROMPT RULES ---
             let systemInstruction = `
               You are an expert email assistant.
               RULES:
-              1. **Output Format:** Plain HTML (<p>, <br>).
-              2. **NO Markdown/Bold:** Do NOT use bold (**) or markdown formatting anywhere.
-              3. **NO WORD WRAPPING:** Do NOT split words with hyphens. Do NOT insert line breaks to make the text narrow. Let the email client handle the text wrapping naturally.
-              4. **Greeting:** Start with "Hi [Name]" or "Hi All".
-              5. **Sign-off:** End strictly with: <br><br>Kind regards,<br>${userName}
-              6. **Style:** Professional South African English. Concise.
+              1. Output Format: Plain HTML (<p>, <br>).
+              2. NO Markdown/Bold: Do NOT use bold (**) or markdown formatting anywhere.
+              3. NO WORD WRAPPING: Do NOT split words with hyphens. Do NOT insert line breaks to make the text narrow. Let the email client handle the text wrapping naturally.
+              4. Greeting: Start with "Hi [Name]" or "Hi All".
+              5. Sign-off: End strictly with: <br><br>Kind regards,<br>${userName}
+              6. Style: Professional South African English. Concise.
             `;
 
             let userPrompt = "";
@@ -95,27 +93,50 @@ async function runAI(mode) {
                 `;
             }
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+            // --- HYBRID ROUTING LOGIC ---
+            let url;
+            let fetchOptions;
+
+            if (apiKey && apiKey !== "") {
+                // Route to Google Cloud (For your friends)
+                url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+                fetchOptions = {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: systemInstruction + "\n\n" + userPrompt }] }]
+                    })
+                };
+            } else {
+                // Route to Local Ollama (For you)
+                url = "http://127.0.0.1:11434/api/generate";
+                fetchOptions = {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: "gemma3:12b", 
+                        prompt: systemInstruction + "\n\n" + userPrompt,
+                        stream: false
+                    })
+                };
+            }
 
             try {
-                const response = await fetch(url, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    contents: [{ parts: [{ text: systemInstruction + "\n\n" + userPrompt }] }]
-                  })
-                });
-
+                const response = await fetch(url, fetchOptions);
                 const data = await response.json();
                 
-                if (!data.candidates || !data.candidates.length) {
-                     previewBox.innerHTML = "Error: No response from AI.";
-                     return;
-                }
+                let finalHtml = "";
 
-                let finalHtml = data.candidates[0].content.parts[0].text;
+                // Parse response based on which API was used
+                if (apiKey && apiKey !== "") {
+                    if (!data.candidates || !data.candidates.length) throw new Error("No response from Gemini.");
+                    finalHtml = data.candidates[0].content.parts[0].text;
+                } else {
+                    if (!data.response) throw new Error("No response from Local AI.");
+                    finalHtml = data.response;
+                }
                 
-                // --- CLEANUP SCRIPT (Removes any accidental bolding or code blocks) ---
+                // --- CLEANUP SCRIPT ---
                 finalHtml = finalHtml.replace(/\*\*/g, ""); 
                 finalHtml = finalHtml.replace(/```html/g, "").replace(/```/g, "");
 
@@ -131,7 +152,7 @@ async function runAI(mode) {
                 hiddenResult.value = finalHtml;
 
             } catch (error) {
-                previewBox.innerHTML = "Network Error: " + error.message;
+                previewBox.innerHTML = "Error processing request. If using Local AI, ensure Ollama is running and CORS is configured. Details: " + error.message;
             }
         }
       });
