@@ -91,10 +91,11 @@ async function runAI(mode) {
             let userPrompt = "";
             if (mode === "reply") {
                 userPrompt = `
-                CONTEXT: I am replying to an email chain.
+                CONTEXT: I am either replying to an email chain OR forwarding it to new people. 
+                Read MY ROUGH NOTES to determine the intent. If it's a forward, introduce the forwarded context appropriately to the new recipients. If it's a reply, respond directly to the original senders.
                 MY ROUGH NOTES: "${userNotes}"
                 FULL HISTORY: "${fullContext.substring(0, 2000)}"
-                TASK: Write a reply.
+                TASK: Write the email body.
                 `;
             } else {
                 userPrompt = `
