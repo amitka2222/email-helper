@@ -15,57 +15,47 @@ Office.onReady((info) => {
 // --- SETTINGS ---
 function saveSettings() {
     try {
-        const key = document.getElementById("api-key-input").value.trim();
-        const name = document.getElementById("user-name-input").value.trim();
+        const key = document.getElementById("api-key-input").value;
+        const name = document.getElementById("user-name-input").value;
         
-        if (Office.context.roamingSettings) {
-            Office.context.roamingSettings.set("myGeminiKey", key);
-            Office.context.roamingSettings.set("myUserName", name);
-            Office.context.roamingSettings.saveAsync(function (result) {
-                if (result.status !== Office.AsyncResultStatus.Succeeded) {
-                    console.error("Failed to save settings: " + result.error.message);
-                }
-            });
-        } else {
-            localStorage.setItem("myGeminiKey", key);
-            localStorage.setItem("myUserName", name);
-        }
-        checkSettings();
+        // Allow empty key for Local AI routing
+        Office.context.roamingSettings.set("myGeminiKey", key.trim());
+        Office.context.roamingSettings.set("myUserName", name.trim());
+        
+        Office.context.roamingSettings.saveAsync(function (result) {
+            if (result.status === Office.AsyncResultStatus.Succeeded) {
+                checkSettings();
+            } else {
+                document.getElementById("settings-area").innerHTML += "<p style='color:red; font-size:11px;'>Save failed: " + result.error.message + "</p>";
+            }
+        });
     } catch (e) {
-        document.getElementById("preview-box").innerHTML = "<span style='color:red;'>Error saving: " + e.message + "</span>";
+        document.getElementById("settings-area").innerHTML += "<p style='color:red; font-size:11px;'>saveSettings Error: " + e.message + "</p>";
     }
 }
 
 function checkSettings() {
-    let name = "";
-    if (Office.context.roamingSettings) {
-        name = Office.context.roamingSettings.get("myUserName");
-    } 
-    if (!name) {
-        name = localStorage.getItem("myUserName");
-    }
-
-    if (name) { 
-        document.getElementById("settings-area").style.display = "none";
-        document.getElementById("main-area").style.display = "block";
-    } else {
-        document.getElementById("settings-area").style.display = "block";
-        document.getElementById("main-area").style.display = "none";
+    try {
+        // As long as they clicked save, let them into the main area
+        const name = Office.context.roamingSettings.get("myUserName");
+        if (name) { 
+            document.getElementById("settings-area").style.display = "none";
+            document.getElementById("main-area").style.display = "block";
+        } else {
+            document.getElementById("settings-area").style.display = "block";
+            document.getElementById("main-area").style.display = "none";
+        }
+    } catch (e) {
+        document.getElementById("settings-area").innerHTML += "<p style='color:red; font-size:11px;'>checkSettings Error: " + e.message + "</p>";
     }
 }
 
 function clearSettings() {
-    if (Office.context.roamingSettings) {
-        Office.context.roamingSettings.remove("myGeminiKey");
-        Office.context.roamingSettings.remove("myUserName");
-        Office.context.roamingSettings.saveAsync(function () {
-            location.reload();
-        });
-    } else {
-        localStorage.removeItem("myGeminiKey");
-        localStorage.removeItem("myUserName");
+    Office.context.roamingSettings.remove("myGeminiKey");
+    Office.context.roamingSettings.remove("myUserName");
+    Office.context.roamingSettings.saveAsync(function () {
         location.reload();
-    }
+    });
 }
 
 // --- AI LOGIC ---
@@ -90,8 +80,8 @@ async function runAI(mode) {
                 userNotes = "No specific notes highlighted. Infer intent from email thread.";
             }
 
-            const apiKey = Office.context.roamingSettings ? Office.context.roamingSettings.get("myGeminiKey") : localStorage.getItem("myGeminiKey");
-            const userName = (Office.context.roamingSettings ? Office.context.roamingSettings.get("myUserName") : localStorage.getItem("myUserName")) || "[My Name]";
+            const apiKey = Office.context.roamingSettings.get("myGeminiKey");
+            const userName = Office.context.roamingSettings.get("myUserName") || "[My Name]";
 
             // --- STRICT PROMPT RULES ---
             let systemInstruction = `
