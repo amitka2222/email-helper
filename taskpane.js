@@ -18,15 +18,20 @@ function saveSettings() {
     const name = document.getElementById("user-name-input").value;
     
     // Allow empty key for Local AI routing
-    localStorage.setItem("myGeminiKey", key.trim());
-    localStorage.setItem("myUserName", name.trim());
+    Office.context.roamingSettings.set("myGeminiKey", key.trim());
+    Office.context.roamingSettings.set("myUserName", name.trim());
+    Office.context.roamingSettings.saveAsync(function (result) {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) {
+            console.error("Failed to save settings: " + result.error.message);
+        }
+    });
     checkSettings();
 }
 
 function checkSettings() {
     // As long as they clicked save, let them into the main area
-    const name = localStorage.getItem("myUserName");
-    if (name !== null) { 
+    const name = Office.context.roamingSettings.get("myUserName");
+    if (name) { 
         document.getElementById("settings-area").style.display = "none";
         document.getElementById("main-area").style.display = "block";
     } else {
@@ -36,9 +41,11 @@ function checkSettings() {
 }
 
 function clearSettings() {
-    localStorage.removeItem("myGeminiKey");
-    localStorage.removeItem("myUserName");
-    location.reload();
+    Office.context.roamingSettings.remove("myGeminiKey");
+    Office.context.roamingSettings.remove("myUserName");
+    Office.context.roamingSettings.saveAsync(function () {
+        location.reload();
+    });
 }
 
 // --- AI LOGIC ---
@@ -63,19 +70,22 @@ async function runAI(mode) {
                 userNotes = "No specific notes highlighted. Infer intent from email thread.";
             }
 
-            const apiKey = localStorage.getItem("myGeminiKey");
-            const userName = localStorage.getItem("myUserName") || "[My Name]";
+            const apiKey = Office.context.roamingSettings.get("myGeminiKey");
+            const userName = Office.context.roamingSettings.get("myUserName") || "[My Name]";
 
             // --- STRICT PROMPT RULES ---
             let systemInstruction = `
-              You are an expert email assistant.
-              RULES:
-              1. Output Format: Plain HTML (<p>, <br>).
-              2. NO Markdown/Bold: Do NOT use bold (**) or markdown formatting anywhere.
-              3. NO WORD WRAPPING: Do NOT split words with hyphens. Do NOT insert line breaks to make the text narrow. Let the email client handle the text wrapping naturally.
-              4. Greeting: Start with "Hi [Name]" or "Hi All".
-              5. Sign-off: End strictly with: <br><br>Kind regards,<br>${userName}
-              6. Style: Professional South African English. Concise.
+              You are an expert email assistant writing on behalf of ${userName}. 
+              Your goal is to write highly natural, human-sounding emails in professional South African English.
+              
+              CRITICAL RULES FOR TONE AND STYLE:
+              1. NO AI TROPES: Never use phrases like "I hope this email finds you well", "Please do not hesitate to reach out", "Delve", "Moreover", "In conclusion", or "As per our previous".
+              2. SOUTH AFRICAN ENGLISH: Use British/SA spelling (e.g., 'organise', 'colour', 'programme'). Be polite and warm, but direct and concise.
+              3. HUMAN CONVERSATIONAL FLOW: Write as if you are quickly typing a reply. Do not sound like a robotic corporate template. Avoid overly complex vocabulary.
+              4. Output Format: Return only Plain HTML (<p>, <br>).
+              5. NO Markdown: Do NOT use markdown (* or **) or code blocks (\`\`\`).
+              6. Greeting: Start naturally, e.g., "Hi [Name]", "Morning [Name]", or "Afternoon [Name]".
+              7. Sign-off: End strictly with: <br><br>Kind regards,<br>${userName}
             `;
 
             let userPrompt = "";
@@ -148,8 +158,9 @@ async function runAI(mode) {
                     }
                 }
 
-                previewBox.innerHTML = finalHtml;
-                hiddenResult.value = finalHtml;
+                const cleanHtml = typeof DOMPurify !== "undefined" ? DOMPurify.sanitize(finalHtml) : finalHtml;
+                previewBox.innerHTML = cleanHtml;
+                hiddenResult.value = cleanHtml;
 
             } catch (error) {
                 previewBox.innerHTML = "Error processing request. If using Local AI, ensure Ollama is running and CORS is configured. Details: " + error.message;
