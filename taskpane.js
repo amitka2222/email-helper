@@ -1,4 +1,4 @@
-/* global document, Office, fetch, localStorage, window */
+/* global document, Office, fetch, window, DOMPurify */
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) {
@@ -18,7 +18,6 @@ function saveSettings() {
         const key = document.getElementById("api-key-input").value;
         const name = document.getElementById("user-name-input").value;
         
-        // Allow empty key for Local AI routing
         Office.context.roamingSettings.set("myGeminiKey", key.trim());
         Office.context.roamingSettings.set("myUserName", name.trim());
         
@@ -36,7 +35,6 @@ function saveSettings() {
 
 function checkSettings() {
     try {
-        // As long as they clicked save, let them into the main area
         const name = Office.context.roamingSettings.get("myUserName");
         if (name) { 
             document.getElementById("settings-area").style.display = "none";
@@ -119,7 +117,7 @@ async function runAI(mode) {
             let fetchOptions;
 
             if (apiKey && apiKey !== "") {
-                // Route to Google Cloud (For your friends)
+                // Route to Google Cloud
                 url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
                 fetchOptions = {
                     method: "POST",
@@ -129,7 +127,7 @@ async function runAI(mode) {
                     })
                 };
             } else {
-                // Route to Local Ollama (For you)
+                // Route to Local Ollama
                 url = "http://127.0.0.1:11434/api/generate";
                 fetchOptions = {
                     method: "POST",
@@ -148,7 +146,6 @@ async function runAI(mode) {
                 
                 let finalHtml = "";
 
-                // Parse response based on which API was used
                 if (apiKey && apiKey !== "") {
                     if (!data.candidates || !data.candidates.length) throw new Error("No response from Gemini.");
                     finalHtml = data.candidates[0].content.parts[0].text;
@@ -174,7 +171,7 @@ async function runAI(mode) {
                 hiddenResult.value = cleanHtml;
 
             } catch (error) {
-                previewBox.innerHTML = "Error processing request. If using Local AI, ensure Ollama is running and CORS is configured. Details: " + error.message;
+                previewBox.innerHTML = "Error processing request. Details: " + error.message;
             }
         }
       });
